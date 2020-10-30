@@ -41,83 +41,86 @@ void input_sdl_destroy(matron_io_t *io) {
 
 static void* input_sdl_poll(void* data) {
     (void)data;
-    
+
     SDL_Event event;
     union event_data *ev;
-    fprintf(stderr, "starting SDL input loop\n"); 
+    fprintf(stderr, "starting SDL input loop\n");
     while (true) {
         SDL_WaitEvent(&event);
-        fprintf(stderr, "got SDL input %d\n", event.type);
-        switch (event.type) {
-            case SDL_KEYDOWN:
-            case SDL_KEYUP: {
-                fprintf(stderr, "key event\n");
-                int z = event.type == SDL_KEYDOWN ? 1 : 0;
-                switch (event.key.keysym.sym) {
-                    case SDL_SCANCODE_Q:
-                        ev = event_data_new(EVENT_KEY);
-                        ev->key.n = 0;
-                        ev->key.val = z;
-                        event_post(ev);
-                        watch_key(ev->key.n, ev->key.val);
-                        break;
-                    case SDL_SCANCODE_A:
-                        ev = event_data_new(EVENT_KEY);
-                        ev->key.n = 1;
-                        ev->key.val = z;
-                        event_post(ev);
-                        watch_key(ev->key.n, ev->key.val);
-                        break;
-                    case SDL_SCANCODE_Z:
-                        ev = event_data_new(EVENT_KEY);
-                        ev->key.n = 2;
-                        ev->key.val = z;
-                        event_post(ev);
-                        watch_key(ev->key.n, ev->key.val);
-                        break;
-                    case SDL_SCANCODE_W:
-                        ev = event_data_new(EVENT_ENC);
-                        ev->enc.n = 0;
-                        ev->enc.delta = -1;
-                        event_post(ev);
-                        break;
-                    case SDL_SCANCODE_E:
-                        ev = event_data_new(EVENT_ENC);
-                        ev->enc.n = 0;
-                        ev->enc.delta = 1;
-                        event_post(ev);
-                        break;
-                    case SDL_SCANCODE_S:
-                        ev = event_data_new(EVENT_ENC);
-                        ev->enc.n = 1;
-                        ev->enc.delta = -1;
-                        event_post(ev);
-                        break;
-                    case SDL_SCANCODE_D:
-                        ev = event_data_new(EVENT_ENC);
-                        ev->enc.n = 1;
-                        ev->enc.delta = 1;
-                        event_post(ev);
-                        break;
-                    case SDL_SCANCODE_X:
-                        ev = event_data_new(EVENT_ENC);
-                        ev->enc.n = 2;
-                        ev->enc.delta = -1;
-                        event_post(ev);
-                        break;
-                    case SDL_SCANCODE_C:
-                        ev = event_data_new(EVENT_ENC);
-                        ev->enc.n = 2;
-                        ev->enc.delta = 1;
-                        event_post(ev);
-                        break;
-                    default:
-                        break;
-                }
-                break;
+
+        int z = event.type == SDL_KEYDOWN ? 1 : 0;
+
+        // K1, K2, K3 (buttons to press, need to update pressed/unpressed state)
+        if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+            switch (event.key.keysym.scancode) {
+                case SDL_SCANCODE_Q:
+                    ev = event_data_new(EVENT_KEY);
+                    ev->key.n = 1;
+                    ev->key.val = z;
+                    event_post(ev);
+                    watch_key(ev->key.n, ev->key.val);
+                    break;
+                case SDL_SCANCODE_A:
+                    ev = event_data_new(EVENT_KEY);
+                    ev->key.n = 2;
+                    ev->key.val = z;
+                    event_post(ev);
+                    watch_key(ev->key.n, ev->key.val);
+                    break;
+                case SDL_SCANCODE_Z:
+                    ev = event_data_new(EVENT_KEY);
+                    ev->key.n = 3;
+                    ev->key.val = z;
+                    event_post(ev);
+                    watch_key(ev->key.n, ev->key.val);
+                    break;
+                default:
+                    break;
             }
-            default:
-                break;
+        }
+
+        // E1, E2, E3 (buttons to turn, only count keydown input)
+        if (event.type == SDL_KEYDOWN) {
+            switch (event.key.keysym.scancode) {
+                case SDL_SCANCODE_W:
+                    ev = event_data_new(EVENT_ENC);
+                    ev->enc.n = 1;
+                    ev->enc.delta = -1;
+                    event_post(ev);
+                    break;
+                case SDL_SCANCODE_E:
+                    ev = event_data_new(EVENT_ENC);
+                    ev->enc.n = 1;
+                    ev->enc.delta = 1;
+                    event_post(ev);
+                    break;
+                case SDL_SCANCODE_S:
+                    ev = event_data_new(EVENT_ENC);
+                    ev->enc.n = 2;
+                    ev->enc.delta = -1;
+                    event_post(ev);
+                    break;
+                case SDL_SCANCODE_D:
+                    ev = event_data_new(EVENT_ENC);
+                    ev->enc.n = 2;
+                    ev->enc.delta = 1;
+                    event_post(ev);
+                    break;
+                case SDL_SCANCODE_X:
+                    ev = event_data_new(EVENT_ENC);
+                    ev->enc.n = 3;
+                    ev->enc.delta = -1;
+                    event_post(ev);
+                    break;
+                case SDL_SCANCODE_C:
+                    ev = event_data_new(EVENT_ENC);
+                    ev->enc.n = 3;
+                    ev->enc.delta = 1;
+                    event_post(ev);
+                    break;
+                default:
+                    break;
+            }
         }
     }
 

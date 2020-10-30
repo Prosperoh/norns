@@ -9,10 +9,14 @@
 #include "hardware/io.h"
 #include "hardware/screen/screens.h"
 
+unsigned int PIXEL_MULTIPLIER = 7;
+
 typedef struct _screen_sdl_priv {
     SDL_Window *window;
-    SDL_Surface *window_surface;
-    SDL_Surface *draw_surface;
+    SDL_Renderer *renderer;
+    SDL_Texture *draw_texture;
+    void *draw_pixels;
+    int pitch;
 } screen_sdl_priv_t;
 
 static int screen_sdl_config(matron_io_t *io, lua_State *l);
@@ -62,8 +66,25 @@ static void screen_sdl_destroy(matron_io_t *io) {
 static void screen_sdl_paint(matron_fb_t *fb) {
     screen_sdl_priv_t *priv = fb->io.data;
     cairo_paint(fb->cairo);
-    SDL_BlitSurface(priv->draw_surface, NULL, priv->window_surface, NULL);
-    SDL_UpdateWindowSurface(priv->window);
+
+    SDL_Rect texture_rect = { .x = 0, .y = 0, .w = 128, .h = 64 };
+    SDL_Rect window_rect = { .x = 0, .y = 0 };
+    SDL_GetWindowSize(priv->window, &(window_rect.w), &(window_rect.h));
+
+    SDL_UpdateTexture(priv->draw_texture,
+                      &texture_rect,
+                      priv->draw_pixels,
+                      priv->pitch);
+
+    SDL_SetRenderDrawColor(priv->renderer, 0, 0, 0, 255);
+    SDL_RenderClear(priv->renderer);
+
+    SDL_RenderCopy(priv->renderer,
+                   priv->draw_texture,
+                   NULL,
+                   &window_rect);
+
+    SDL_RenderPresent(priv->renderer);
 }
 
 static void screen_sdl_bind(matron_fb_t *fb, cairo_surface_t *surface) {
@@ -77,26 +98,40 @@ static void screen_sdl_surface_destroy(void *data) {
     if (priv == NULL) {
         return;
     }
-    SDL_FreeSurface(priv->draw_surface);
+
+    SDL_UnlockTexture(priv->draw_texture);
+    SDL_DestroyTexture(priv->draw_texture);
+    SDL_DestroyRenderer(priv->renderer);
     SDL_DestroyWindow(priv->window);
     free(priv);
 }
 
 static cairo_surface_t *screen_sdl_surface_create(screen_sdl_priv_t *priv) {
     cairo_surface_t *surface;
+    int cairo_format = CAIRO_FORMAT_RGB16_565;
 
     SDL_Init(SDL_INIT_VIDEO);
     priv->window = SDL_CreateWindow("matron",
-                                    SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,                                 128, 64,
+                                    SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                                    128 * PIXEL_MULTIPLIER, 64 * PIXEL_MULTIPLIER,
                                     SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
-    priv->window_surface = SDL_GetWindowSurface(priv->window);
-    priv->draw_surface = SDL_CreateRGBSurface(0,
-                                              128, 64,
-                                              16, 0xf800, 0x000007e0, 0x0000001f,
-                                              0);
-    surface = cairo_image_surface_create_for_data((unsigned char *)priv->draw_surface->pixels,
-                                                  CAIRO_FORMAT_RGB16_565, priv->draw_surface->w, priv->draw_surface->h,
-                                                  cairo_format_stride_for_width(CAIRO_FORMAT_RGB16_565, priv->draw_surface->w));
+
+    priv->renderer = SDL_CreateRenderer(priv->window,
+                                        -1,
+                                        SDL_RENDERER_ACCELERATED);
+
+    priv->draw_texture = SDL_CreateTexture(priv->renderer,
+                                           SDL_PIXELFORMAT_RGB565,
+                                           SDL_TEXTUREACCESS_STREAMING,
+                                           128, 64);
+
+    SDL_LockTexture(priv->draw_texture, NULL, &(priv->draw_pixels), &(priv->pitch));
+
+    surface = cairo_image_surface_create_for_data((unsigned char*) priv->draw_pixels,
+                                                  cairo_format,
+                                                  128, 64,
+                                                  priv->pitch);
+
     cairo_surface_set_user_data(surface, NULL, priv, &screen_sdl_surface_destroy);
 
     return surface;
